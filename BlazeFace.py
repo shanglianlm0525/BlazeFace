@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from functools import reduce
 
 class BlazeBlock(nn.Module):
     def __init__(self, in_channels,out_channels,mid_channels=None,stride=1):
@@ -21,20 +19,17 @@ class BlazeBlock(nn.Module):
         )
 
         if self.use_pool:
-            self.maxpool = nn.MaxPool2d(kernel_size=stride,stride=stride)
-            self.channel_pad = out_channels-in_channels
+            self.shortcut = nn.Sequential(
+                nn.MaxPool2d(kernel_size=stride, stride=stride),
+                nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1),
+                nn.BatchNorm2d(out_channels),
+            )
 
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         branch1 = self.branch1(x)
-
-        if self.use_pool:
-            branch2 = self.maxpool(x)
-            branch2 = F.pad(branch2, (0, 0, 0, 0, 0, self.channel_pad), 'constant', 0)
-        else:
-            branch2 = x
-        out = reduce(lambda x, y: x + y, [branch1, branch2])
+        out = (branch1+self.shortcut(x)) if self.use_pool else (branch1+x)
         return self.relu(out)
 
 class DoubleBlazeBlock(nn.Module):
@@ -60,20 +55,17 @@ class DoubleBlazeBlock(nn.Module):
         )
 
         if self.use_pool:
-            self.maxpool = nn.MaxPool2d(kernel_size=stride, stride=stride)
-            self.channel_pad = out_channels - in_channels
+            self.shortcut = nn.Sequential(
+                nn.MaxPool2d(kernel_size=stride, stride=stride),
+                nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1),
+                nn.BatchNorm2d(out_channels),
+            )
 
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         branch1 = self.branch1(x)
-
-        if self.use_pool:
-            branch2 = self.maxpool(x)
-            branch2 = F.pad(branch2, (0, 0, 0, 0, 0, self.channel_pad), 'constant', 0)
-        else:
-            branch2 = x
-        out = reduce(lambda x, y: x + y, [branch1, branch2])
+        out = (branch1 + self.shortcut(x)) if self.use_pool else (branch1 + x)
         return self.relu(out)
 
 
